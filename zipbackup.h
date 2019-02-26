@@ -2,16 +2,20 @@
 #define ZIPBACKUP_H
 
 typedef struct {
-  const char *filename;
-  const char *path;
+  char *filename;
+  char *path;
+  int archtype;
 } zipbackup;
 
-void zipbackup_constructor(zipbackup * const this);
-char *zipbackup_bzipfile(zipbackup * const this,
+void zipbackup_constructor(zipbackup * const self,
+                           const char *filename,
+                           const char *path,
+                           const char *archtype);
+void zipbackup_destructor(zipbackup * const self);
+char *zipbackup_bzipfile(zipbackup * const self,
                          const char *filename,
                          const char *path);
-char *zipbackup_bextract(zipbackup * const this,
-                         const char *filename,
-                         const char *path);
+char *zipbackup_bextract(zipbackup * const self);
+
 
 #endif

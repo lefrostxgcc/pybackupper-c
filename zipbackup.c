@@ -1,45 +1,80 @@
 #include <zipbackup.h>
+#include <zipfile.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
+#include <stdarg.h>
 
-#define MSG1 "Файлы по пути "
-#define MSG2 " архивированы в архив "
-#define MSG3 "Архив "
-#define MSG4 " распакован в каталог "
-
-enum {MSG1_LEN = (sizeof MSG1) - 1, MSG2_LEN = (sizeof MSG2) - 1,
-      MSG3_LEN = (sizeof MSG3) - 1, MSG4_LEN = (sizeof MSG4) - 1};
-
-void zipbackup_constructor(zipbackup * const this)
+static char *chip_concat(const char *s, ...)
 {
-  this->filename = "";
-  this->path = "";
+  if (s == NULL)
+    return NULL;
+  va_list ap;
+  const char *s_saved = s;
+  const char *p = NULL;
+  size_t len = strlen(s);
+  va_start(ap, s);
+  while ((p = va_arg(ap, const char *)) != NULL)
+    len += strlen(p);
+  char *result = (char *) malloc(len + 1);
+  if (result == NULL)
+    return NULL;
+  *result = '\0';
+  strcat(result, s_saved);
+  va_end(ap);
+  s = s_saved;
+  va_start(ap, s);
+  p = NULL;
+  while ((p = va_arg(ap, const char *)) != NULL)
+    strcat(result, p);
+  va_end(ap);
+  return result;
 }
 
-static char *concat(const char *s1, const char *s2,
-                    const char *s3, const char *s4)
+void zipbackup_constructor(zipbackup * const self, const char *filename,
+                           const char *path, const char *mode)
 {
-  size_t s1_len = strlen(s1);
-  size_t s2_len = strlen(s2);
-  size_t s3_len = strlen(s3);
-  size_t s4_len = strlen(s4);
-  size_t s_len = s1_len + s2_len + s3_len + s4_len + 1;
-  char *s = (char *) malloc(s_len);
-  memcpy(s, s1, s1_len);
-  memcpy(s + s1_len, s2, s2_len);
-  memcpy(s + s1_len + s2_len, s3, s3_len);
-  memcpy(s + s1_len + s2_len + s3_len, s4, s4_len);
-  s[s1_len + s2_len + s3_len + s4_len] = '\0';
-  return s;
+  self->filename = strdup(filename);
+  self->path = strdup(path);
+  if (mode && mode[0] == 'r')
+    self->archtype = ZIP_RDONLY;
+  else
+    self->archtype = ZIP_CREATE | ZIP_TRUNCATE;
 }
 
-char *zipbackup_bzipfile(zipbackup *const this, const char *filename, const char *path)
+void zipbackup_destructor(zipbackup * const self)
 {
-  return concat("Файлы по пути ", path, " архивированы в архив ", filename);
+  free(self->filename);
+  free(self->path);
+  self->filename = NULL;
+  self->path = NULL;
+  printf("Экземпляр класса уничтожен\n");
 }
 
-char *zipbackup_bextract(zipbackup * const this, const char *filename, const char *path)
+char *zipbackup_bzipfile(zipbackup *const self, const char *filename, const char *path)
 {
-    return concat("Архив ", filename, " распакован в каталог ", path);
+  (void) self;
+  return chip_concat("Файлы по пути ", path, " архивированы в архив ", filename, NULL);
+}
+
+char *zipbackup_bextract(zipbackup * const self)
+{
+  char *result = NULL;
+  zip_error_t *err = NULL;
+  int ze = 0;
+  zip_t *wr = zip_open(self->filename, self->archtype, &ze);
+  if (!wr)
+    {
+      zip_error_t error;
+      zip_error_init_with_code(&error, ze);
+      result = chip_concat("Error: ", zip_error_strerror(&error), NULL);
+    }
+  else if (!extractall(wr, self->path, &err))
+    result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
+  else if (zip_close(wr) == -1)
+    result = chip_concat("Error: ", zip_error_strerror(zip_get_error(wr)), NULL);
+  else
+    result = chip_concat("Архив ", self->filename, " распакован в каталог ", self->path, NULL);
+  return result;
 }

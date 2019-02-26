@@ -1,6 +1,8 @@
 INCLUDE_DIRS := .
-CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRS))
-HEADERS := zipbackup.h
+override CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRS))
+override CFLAGS += -Wall -Wextra -Werror
+override LIBS += -lzip
+HEADERS := zipbackup.h zipfile.h
 SRCS := $(wildcard *.c)
 OBJS := $(SRCS:.c=.o)
 TARGET := pybackupper
