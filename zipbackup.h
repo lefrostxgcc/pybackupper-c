@@ -12,10 +12,7 @@ void zipbackup_constructor(zipbackup * const self,
                            const char *path,
                            const char *archtype);
 void zipbackup_destructor(zipbackup * const self);
-char *zipbackup_bzipfile(zipbackup * const self,
-                         const char *filename,
-                         const char *path);
+char *zipbackup_bzipfile(zipbackup * const self);
 char *zipbackup_bextract(zipbackup * const self);
-
 
 #endif

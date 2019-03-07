@@ -52,10 +52,26 @@ void zipbackup_destructor(zipbackup * const self)
   printf("Экземпляр класса уничтожен\n");
 }
 
-char *zipbackup_bzipfile(zipbackup *const self, const char *filename, const char *path)
+char *zipbackup_bzipfile(zipbackup *const self)
 {
-  (void) self;
-  return chip_concat("Файлы по пути ", path, " архивированы в архив ", filename, NULL);
+  char *result = NULL;
+  zip_error_t *err = NULL;
+  int ze = 0;
+  zip_t *wr = zip_open(self->filename, self->archtype, &ze);
+  if (!wr)
+    {
+      zip_error_t error;
+      zip_error_init_with_code(&error, ze);
+      result = chip_concat("Error: ", zip_error_strerror(&error), NULL);
+    }
+  else if (!compress(wr, self->path, &err))
+    result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
+  else if (zip_close(wr) == -1)
+    result = chip_concat("Error: ", zip_error_strerror(zip_get_error(wr)), NULL);
+  else
+    result = chip_concat("Файлы по пути ", self->path,
+                         " архивированы в архив ", self->filename, NULL);
+  return result;
 }
 
 char *zipbackup_bextract(zipbackup * const self)

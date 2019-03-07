@@ -1,17 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <zipbackup.h>
 
-int main(void)
+int main(int argc, char *argv[])
 {
-  printf("PyBackupper: 1.0.0.0b\n");
-  zipbackup zip;
-  zipbackup_constructor(&zip, "/home/chip/python/test/zip/backup_2c.zip", "/home/chip/python/", "r");
-  /* char *bzip_str = zipbackup_bzipfile(&zip, zip.filename, zip.path); */
-  char *bext_str = zipbackup_bextract(&zip);
-  /* printf("%s\n", bzip_str); */
-  printf("%s\n", bext_str);
-  /* free(bzip_str); */
-  free(bext_str);
-  zipbackup_destructor(&zip);
+  printf("PyBackupper: 1.0.0.0e\n");
+  if (argc > 3)
+    {
+      if (strcmp(argv[1], "-a") == 0)
+        {
+          zipbackup zip;
+          zipbackup_constructor(&zip, argv[2], argv[3], "w");
+          char *s = zipbackup_bzipfile(&zip);
+          printf("%s\n", s);
+          free(s);
+          zipbackup_destructor(&zip);
+        }
+      else if (strcmp(argv[1], "-e") == 0)
+        {
+          zipbackup zip;
+          zipbackup_constructor(&zip, argv[2], argv[3], "r");
+          char *s = zipbackup_bextract(&zip);
+          printf("%s\n", s);
+          free(s);
+          zipbackup_destructor(&zip);
+        }
+    }
 }

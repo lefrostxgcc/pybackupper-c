@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <zipfile.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,14 +22,40 @@ static int create_dir(const char *dir)
   return 1;
 }
 
-static char *strcat_new(const char *s1, const char *s2)
+static char *concat_dir_filename(const char *dir, const char *filename)
 {
-  size_t s1_len = strlen(s1);
-  size_t s2_len = strlen(s2);
-  char *s = (char *) malloc(s1_len + s2_len + 1);
-  memcpy(s, s1, s1_len);
-  memcpy(s + s1_len, s2, s2_len);
-  s[s1_len + s2_len] = '\0';
+  size_t dir_len = strlen(dir);
+  size_t filename_len = strlen(filename);
+  int add_dir_slash = dir[dir_len - 1] != '/';
+  char *s = (char *) malloc(dir_len + filename_len + add_dir_slash + 1);
+  char *p = s;
+  *p = '\0';
+  strcpy(p, dir);
+  p += dir_len;
+  if (add_dir_slash)
+    *p++ = '/';
+  strcpy(p, filename);
+  return s;
+}
+
+static char *concat_dir_dir(const char *dir, const char *filename)
+{
+  size_t dir_len = strlen(dir);
+  size_t filename_len = strlen(filename);
+  int add_dir_slash = dir[dir_len - 1] != '/';
+  int add_filename_slash = filename[filename_len - 1] != '/';
+  char *s = (char *) malloc(dir_len + filename_len + add_dir_slash
+                            + add_filename_slash + 1);
+  char *p = s;
+  *p = '\0';
+  strcpy(p, dir);
+  p += dir_len;
+  if (add_dir_slash)
+    *p++ = '/';
+  strcpy(p, filename);
+  p += filename_len;
+  if (add_filename_slash)
+    *p++ = '/';
   return s;
 }
 
@@ -83,10 +110,9 @@ int extractall(zip_t *z, const char *path, zip_error_t **err)
           *err = zip_get_error(z);
           return 0;
         }
-      char *filename = strcat_new(path, sb.name);
+      char *filename = concat_dir_filename(path, sb.name);
       if (sb.name[strlen(sb.name) - 1] == '/')
         {
-
           if (!create_dir(filename))
             return 0;
         }
@@ -126,17 +152,6 @@ int extractall(zip_t *z, const char *path, zip_error_t **err)
       free(filename);
     }
   return 1;
-}
-
-static char *concat_dir_filename(const char *dir, const char *filename)
-{
-  size_t dir_len = strlen(dir);
-  size_t filename_len = strlen(filename);
-  char *s = (char *) malloc(dir_len + filename_len + 2);
-  strcpy(s, dir);
-  strcpy(s + dir_len + 1, filename);
-  s[dir_len] = '/';
-  return s;
 }
 
 static int add_file(zip_t *z,
@@ -179,14 +194,19 @@ static int compress_dir(zip_t *z, const char *dir, const char *path, zip_error_t
           if (strcmp(fd->d_name, ".") == 0 ||
               strcmp(fd->d_name, "..") == 0)
             continue;
-          char *sub_dir = concat_dir_filename(dir, fd->d_name);
-          char *sub_path = concat_dir_filename(path, fd->d_name);
+          char *sub_dir = concat_dir_dir(dir, fd->d_name);
+          char *sub_path = concat_dir_dir(path, fd->d_name);
           if (zip_dir_add(z, sub_path, ZIP_FL_ENC_UTF_8) == -1)
             {
-              free(sub_dir);
-              free(sub_path);
-              *err = zip_get_error(z);
-              return 0;
+              if (zip_error_code_zip(zip_get_error(z)) == ZIP_ER_EXISTS)
+                  zip_error_clear(z);
+              else
+                {
+                  free(sub_dir);
+                  free(sub_path);
+                  *err = zip_get_error(z);
+                  return 0;
+                }
             }
           if (!compress_dir(z, sub_dir, sub_path, err))
             {
@@ -210,13 +230,53 @@ static int compress_dir(zip_t *z, const char *dir, const char *path, zip_error_t
 
 int compress(zip_t *z, const char *dir, zip_error_t **err)
 {
-  const char *path = dir;
+  *err = NULL;
+  char *abs_dir = NULL;
+  if (*dir == '/')
+    abs_dir = strdup(dir);
+  else
+    {
+      char *curr_dir = get_current_dir_name();
+      abs_dir = concat_dir_dir(curr_dir, dir);
+      free(curr_dir);
+    }
+  char *path = abs_dir;
   while (path != NULL && *path == '/')
     path++;
-  *err = NULL;
-  if (!compress_dir(z, dir, path, err))
-    return 0;
+  char *p1 = path, *p2 = path;
+  while (p1 != NULL && p2 != NULL)
+    {
+      char *p2 = strchr(p1, '/');
+      if (p2)
+        *p2 = '\0';
+      if (zip_dir_add(z, path, ZIP_FL_ENC_UTF_8) == -1)
+        {
+          if (zip_error_code_zip(zip_get_error(z)) == ZIP_ER_EXISTS)
+            zip_error_clear(z);
+          else
+            {
+              *err = zip_get_error(z);
+              free(abs_dir);
+              return 0;
+            }
+        }
+      if (p2)
+        {
+          *p2 = '/';
+          p1 = p2 + 1;
+        }
+      else
+        p1 = NULL;
+    }
+  if (!compress_dir(z, abs_dir, path, err))
+    {
+      free(abs_dir);
+      return 0;
+    }
   else
-    return 1;
+    {
+      free(abs_dir);
+      return 1;
+    }
 }
 
