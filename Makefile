@@ -1,6 +1,7 @@
 INCLUDE_DIRS := .
+CC := gcc
 override CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRS))
-override CFLAGS += -Wall -Wextra -Werror
+CFLAGS += -g -O0 -Wall -Wextra -Werror
 override LIBS += -lzip
 HEADERS := zipbackup.h zipfile.h
 SRCS := $(wildcard *.c)
@@ -14,7 +15,7 @@ vpath %.h $(INCLUDE_DIRS)
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 $(OBJS) : $(HEADERS)
 

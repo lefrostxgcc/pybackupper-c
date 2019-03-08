@@ -6,6 +6,10 @@
 #include <errno.h>
 #include <stdarg.h>
 
+static char *zipbackup_addarchive(zipbackup * const self, zip_t *wr);
+static char *zipbackup_extract(zipbackup * const self, zip_t *wr);
+static char *zipbackup_view(zipbackup * const self, zip_t *wr);
+
 static char *chip_concat(const char *s, ...)
 {
   if (s == NULL)
@@ -33,29 +37,37 @@ static char *chip_concat(const char *s, ...)
 }
 
 void zipbackup_constructor(zipbackup * const self, const char *filename,
-                           const char *path, const char *mode)
+                           const char *path, const char *command)
 {
   self->filename = strdup(filename);
   self->path = strdup(path);
-  if (mode && mode[0] == 'r')
-    self->archtype = ZIP_RDONLY;
-  else
-    self->archtype = ZIP_CREATE | ZIP_TRUNCATE;
+  self->archtype = ZIP_RDONLY;
+  if (command)
+    {
+      if (strcmp(command, "-a") == 0)
+        self->archtype = ZIP_CREATE | ZIP_TRUNCATE;
+      else if (strcmp(command, "-e") == 0)
+        self->archtype = ZIP_RDONLY;
+      else if (strcmp(command, "-v") == 0)
+        self->archtype = ZIP_RDONLY;
+    }
+  self->command = strdup(command);
 }
 
 void zipbackup_destructor(zipbackup * const self)
 {
   free(self->filename);
   free(self->path);
+  free(self->command);
   self->filename = NULL;
   self->path = NULL;
+  self->command = NULL;
   printf("Экземпляр класса уничтожен\n");
 }
 
-char *zipbackup_bzipfile(zipbackup *const self)
+char *zipbackup_bbackup(zipbackup *const self)
 {
   char *result = NULL;
-  zip_error_t *err = NULL;
   int ze = 0;
   zip_t *wr = zip_open(self->filename, self->archtype, &ze);
   if (!wr)
@@ -63,34 +75,50 @@ char *zipbackup_bzipfile(zipbackup *const self)
       zip_error_t error;
       zip_error_init_with_code(&error, ze);
       result = chip_concat("Error: ", zip_error_strerror(&error), NULL);
+      return result;
     }
-  else if (!compress(wr, self->path, &err))
-    result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
-  else if (zip_close(wr) == -1)
-    result = chip_concat("Error: ", zip_error_strerror(zip_get_error(wr)), NULL);
+  if (strcmp(self->command, "-a") == 0)
+    result = zipbackup_addarchive(self, wr);
+  else if (strcmp(self->command, "-e") == 0)
+    result = zipbackup_extract(self, wr);
+  else if (strcmp(self->command, "-v") == 0)
+    result = zipbackup_view(self, wr);
   else
-    result = chip_concat("Файлы по пути ", self->path,
-                         " архивированы в архив ", self->filename, NULL);
+    result = strdup("unknown option");
+  zip_close(wr);
   return result;
 }
 
-char *zipbackup_bextract(zipbackup * const self)
+static char *zipbackup_addarchive(zipbackup * const self, zip_t *wr)
 {
   char *result = NULL;
   zip_error_t *err = NULL;
-  int ze = 0;
-  zip_t *wr = zip_open(self->filename, self->archtype, &ze);
-  if (!wr)
-    {
-      zip_error_t error;
-      zip_error_init_with_code(&error, ze);
-      result = chip_concat("Error: ", zip_error_strerror(&error), NULL);
-    }
-  else if (!extractall(wr, self->path, &err))
+  if (!compress(wr, self->path, &err))
     result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
-  else if (zip_close(wr) == -1)
-    result = chip_concat("Error: ", zip_error_strerror(zip_get_error(wr)), NULL);
+  else
+    result = chip_concat("Файлы по пути ", self->path, " архивированы в архив ", self->filename, NULL);
+  return result;
+}
+
+static char *zipbackup_extract(zipbackup * const self, zip_t *wr)
+{
+  char *result = NULL;
+  zip_error_t *err = NULL;
+  if (!extractall(wr, self->path, &err))
+    result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
   else
     result = chip_concat("Архив ", self->filename, " распакован в каталог ", self->path, NULL);
+  return result;
+}
+
+static char *zipbackup_view(zipbackup * const self, zip_t *wr)
+{
+  (void) self;
+  char *result = NULL;
+  zip_error_t *err = NULL;
+  if (!printdir(wr, &err))
+    result = chip_concat("Error: ", err ? zip_error_strerror(err) : strerror(errno), NULL);
+  else
+    result = strdup("");
   return result;
 }

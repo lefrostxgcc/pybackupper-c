@@ -28,8 +28,8 @@ static char *concat_dir_filename(const char *dir, const char *filename)
   size_t filename_len = strlen(filename);
   int add_dir_slash = dir[dir_len - 1] != '/';
   char *s = (char *) malloc(dir_len + filename_len + add_dir_slash + 1);
+  *s = '\0';
   char *p = s;
-  *p = '\0';
   strcpy(p, dir);
   p += dir_len;
   if (add_dir_slash)
@@ -46,16 +46,17 @@ static char *concat_dir_dir(const char *dir, const char *filename)
   int add_filename_slash = filename[filename_len - 1] != '/';
   char *s = (char *) malloc(dir_len + filename_len + add_dir_slash
                             + add_filename_slash + 1);
+  *s = '\0';
   char *p = s;
-  *p = '\0';
-  strcpy(p, dir);
+  memcpy(p, dir, dir_len);
   p += dir_len;
   if (add_dir_slash)
     *p++ = '/';
-  strcpy(p, filename);
+  memcpy(p, filename, filename_len);
   p += filename_len;
   if (add_filename_slash)
     *p++ = '/';
+  *p = '\0';
   return s;
 }
 
@@ -232,14 +233,14 @@ int compress(zip_t *z, const char *dir, zip_error_t **err)
 {
   *err = NULL;
   char *abs_dir = NULL;
-  if (*dir == '/')
-    abs_dir = strdup(dir);
-  else
+  //  if (*dir == '/')
+  abs_dir = strdup(dir);
+  /*  else
     {
       char *curr_dir = get_current_dir_name();
       abs_dir = concat_dir_dir(curr_dir, dir);
       free(curr_dir);
-    }
+      }*/
   char *path = abs_dir;
   while (path != NULL && *path == '/')
     path++;

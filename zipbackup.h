@@ -4,6 +4,7 @@
 typedef struct {
   char *filename;
   char *path;
+  char *command;
   int archtype;
 } zipbackup;
 
@@ -12,7 +13,6 @@ void zipbackup_constructor(zipbackup * const self,
                            const char *path,
                            const char *archtype);
 void zipbackup_destructor(zipbackup * const self);
-char *zipbackup_bzipfile(zipbackup * const self);
-char *zipbackup_bextract(zipbackup * const self);
+char *zipbackup_bbackup(zipbackup * const self);
 
 #endif
