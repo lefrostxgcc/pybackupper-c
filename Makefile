@@ -1,29 +1,21 @@
 INCLUDE_DIRS := .
-CC := gcc
-override CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRS))
-CFLAGS += -g -O0 -Wall -Wextra -Werror
-override LIBS += -lzip
+override CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRS)) `pkg-config json-glib-1.0 --cflags`
+CFLAGS += -Wall -Wextra
+override LDLIBS += -lzip `pkg-config json-glib-1.0 --libs`
 HEADERS := zipbackup.h zipfile.h
 SRCS := $(wildcard *.c)
 OBJS := $(SRCS:.c=.o)
 TARGET := pybackupper
 
-.PHONY = all clean fclean re
+.PHONY = all clean
 
 vpath %.h $(INCLUDE_DIRS)
 
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 $(OBJS) : $(HEADERS)
 
 clean :
-	-rm -f $(OBJS)
-
-fclean : clean
-	-rm -f $(TARGET)
-
-re: fclean all
-
+	-rm -f $(TARGET) $(OBJS)
